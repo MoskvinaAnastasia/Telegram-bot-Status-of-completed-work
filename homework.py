@@ -1,3 +1,4 @@
+import requests
 import telegram
 import time
 import os
@@ -36,8 +37,13 @@ def send_message(bot: telegram.Bot, message: str) -> None:
         print(f"Ошибка при отправке сообщения: {error}")
 
 
-def get_api_answer(timestamp):
-    ...
+def get_api_answer(timestamp: int) -> dict:
+    """Делает запрос к единственному эндпоинту API-сервиса."""
+    params = {'from_date': timestamp}
+    response = requests.get(ENDPOINT, headers=HEADERS, params=params)
+    if response.status_code != 200:
+        raise RuntimeError(f"Ошибка запроса: {response.status_code}")
+    return response.json()
 
 
 def check_response(response: dict) -> bool:
@@ -53,7 +59,7 @@ def check_response(response: dict) -> bool:
     if 'homeworks' not in response:
         message = "В ответе отсутствует ключ 'homeworks'."
         raise KeyError(message)
-    
+
     if 'current_date' not in response:
         message = "В ответе отсутствует ключ 'current_date'."
         raise KeyError(message)
@@ -61,11 +67,11 @@ def check_response(response: dict) -> bool:
     if not isinstance(response.get('homeworks'), list):
         message = "Формат ответа не соответствует списку."
         raise TypeError(message)
-    
+
     if not isinstance(response.get('homeworks'), int):
         message = "Формат ответа не соответствует числу."
         raise TypeError(message)
-    
+
     expected_keys = {'date_updated', 'homework_name', 'id', 'lesson_name',
                      'reviewer_comment', 'status'}
     if not set('homeworks'.keys()) == expected_keys:
@@ -74,9 +80,10 @@ def check_response(response: dict) -> bool:
 
 
 def parse_status(homework: dict) -> str:
-    """Извлекает из информации о конкретной
-    домашней работе статус этой работы.
-    """
+    """Извлекает статус домашней работы."""
+    homework_name = homework.get('homework_name')
+    status = homework.get('status')
+    verdict = HOMEWORK_VERDICTS.get(status, 'Статус работы не определен')
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
