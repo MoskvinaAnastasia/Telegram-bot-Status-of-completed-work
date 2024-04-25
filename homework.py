@@ -13,7 +13,9 @@ import telegram
 load_dotenv()
 
 logging.basicConfig(
-    handlers=logging.StreamHandler(stream=sys.stdout),
+    handlers=[logging.StreamHandler(stream=sys.stdout),
+              logging.FileHandler('logging_bot.log')
+              ],
     level=logging.DEBUG,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
@@ -43,11 +45,11 @@ def send_message(bot: telegram.Bot, message: str) -> None:
     """Отправляет сообщение в Telegram чат."""
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message,)
-        logging.debug(f"Сообщение успешно отправлено в Telegram: {message}")
+        logging.debug(f"Сообщение отправлено в Telegram: {message}")
+        return True
     except telegram.TelegramError as error:
         logging.error(f"Ошибка при отправке сообщения в Telegram: {error}")
-    else:
-        logging.info('Статус отправлен в Telegram')
+        return False
 
 
 def get_api_answer(timestamp: int) -> dict:
@@ -137,14 +139,19 @@ def main():
                 logging.info('Найдена домашняя работа')
                 if homeworks[0] != last_message:
                     logging.info('Есть новая домашняя работа')
-                    message_sent = send_message(
-                        bot, parse_status(homeworks[0])
-                    )
-                    if message_sent:
-                        last_message = message_sent
-                        timestamp = int(time.time())
-            else:
-                logging.debug('Новых домашних работ еще не было')
+                    try:
+                        message_sent = send_message(
+                            bot, parse_status(homeworks[0])
+                        )
+                        if message_sent:
+                            last_message = message_sent
+                            timestamp = int(time.time())
+                    except Exception as error:
+                        logging.error(f'Ошибка отправки сообщения '
+                                      f'в Telegram: {error}')
+                else:
+                    logging.debug('Новых домашних работ еще не было')
+
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             logging.error(message)
