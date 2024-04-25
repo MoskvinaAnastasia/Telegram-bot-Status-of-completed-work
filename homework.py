@@ -134,11 +134,9 @@ def main():
         try:
             response = get_api_answer(timestamp)
             homeworks = check_response(response)
-            logging.debug('Проверка существования новой домашней работы')
+            logging.debug('Проверка новой домашней работы')
             if homeworks:
-                logging.info('Найдена домашняя работа')
                 if homeworks[0] != last_message:
-                    logging.info('Есть новая домашняя работа')
                     try:
                         message_sent = send_message(
                             bot, parse_status(homeworks[0])
