@@ -44,7 +44,7 @@ def send_message(bot: telegram.Bot, message: str) -> None:
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message,)
         logging.debug(f"Сообщение успешно отправлено в Telegram: {message}")
-    except Exception as error:
+    except telegram.TelegramError as error:
         logging.error(f"Ошибка при отправке сообщения в Telegram: {error}")
     else:
         logging.info('Статус отправлен в Telegram')
@@ -95,13 +95,9 @@ def check_response(response: dict) -> bool:
         logging.error(message)
         raise TypeError(message)
 
-    expected_keys = {'date_updated', 'homework_name', 'id', 'lesson_name',
-                     'reviewer_comment', 'status'}
-    if not set(response['homeworks'][0].keys()) == expected_keys:
-        logging.error(message)
-        raise ValueError("Элемент списка 'homeworks' "
-                         "не содержит ожидаемые ключи")
-    return response.get('homeworks', [])
+    homeworks = response.get('homeworks')
+    if homeworks is None:
+        raise ValueError('Ответ API не содержит ключ "homeworks"')
 
 
 def parse_status(homework: dict) -> str:
@@ -135,29 +131,25 @@ def main():
     while True:
         try:
             response = get_api_answer(timestamp)
-            if 'homeworks' not in response:
-                logging.debug("Домашних работ нет.")
-                send_message(bot, "Изменений нет.")
-                break
             homeworks = check_response(response)
-            if not homeworks:
-                logging.debug("Отсутствие в ответе новых статусов.")
-            for homework in homeworks:
-                message = parse_status(homework)
-                if last_message != message:
-                    send_message(bot, message)
-                    last_message = message
-            timestamp = response.get("current_date")
-
+            logging.debug('Проверка существования новой домашней работы')
+            if homeworks:
+                logging.info('Найдена домашняя работа')
+                if homeworks[0] != last_message:
+                    logging.info('Есть новая домашняя работа')
+                    message_sent = send_message(
+                        bot, parse_status(homeworks[0])
+                    )
+                    if message_sent:
+                        last_message = message_sent
+                        timestamp = int(time.time())
+            else:
+                logging.debug('Новых домашних работ еще не было')
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
-            logging.error(message, exc_info=True)
-            if message != last_message:
-                send_message(bot, message)
-                last_message = message
-
-        finally:
-            time.sleep(RETRY_PERIOD)
+            logging.error(message)
+            send_message(bot, f'Произошла ошибка: {error}')
+        time.sleep(RETRY_PERIOD)
 
 
 if __name__ == '__main__':
