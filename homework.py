@@ -1,8 +1,12 @@
+import logging
 import requests
+import sys
 import telegram
 import time
 import os
+from http import HTTPStatus
 from dotenv import load_dotenv
+
 
 # Загрузка переменных окружения из файла .env
 load_dotenv()
@@ -41,7 +45,7 @@ def get_api_answer(timestamp: int) -> dict:
     """Делает запрос к единственному эндпоинту API-сервиса."""
     params = {'from_date': timestamp}
     response = requests.get(ENDPOINT, headers=HEADERS, params=params)
-    if response.status_code != 200:
+    if response.status_code != HTTPStatus.OK:
         raise RuntimeError(f"Ошибка запроса: {response.status_code}")
     return response.json()
 
@@ -68,7 +72,7 @@ def check_response(response: dict) -> bool:
         message = "Формат ответа не соответствует списку."
         raise TypeError(message)
 
-    if not isinstance(response.get('homeworks'), int):
+    if not isinstance(response.get('current_date'), int):
         message = "Формат ответа не соответствует числу."
         raise TypeError(message)
 
@@ -89,24 +93,42 @@ def parse_status(homework: dict) -> str:
 
 def main():
     """Основная логика работы бота."""
-
-    ...
+    if not check_tokens():
+        message = 'Программа останавливается. Отсутствуют токены'
+        logging.critical(message)
+        sys.exit(message)
 
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
-    text = 'Бот начал работу'
+    text = 'Я всего лишь машина, только имитация жизни, ' \
+           'но давай проверим твою работу'
     bot.send_message(TELEGRAM_CHAT_ID, text)
-    ...
+    last_message = ""
 
     while True:
         try:
-
-            ...
+            response = get_api_answer(timestamp)
+            if 'homeworks' not in response:
+                logging.debug("Домашних работ нет.")
+                send_message(bot, "Изменений нет.")
+                break
+            homeworks = check_response(response)
+            for homework in homeworks:
+                message = parse_status(homework)
+                if last_message != message:
+                    send_message(bot, message)
+                    last_message = message
+            timestamp = response.get("current_date")
 
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
-            ...
-        ...
+            logging.error(message, exc_info=True)
+            if message != last_message:
+                send_message(bot, message)
+                last_message = message
+
+        finally:
+            time.sleep(RETRY_PERIOD)
 
 
 if __name__ == '__main__':
