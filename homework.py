@@ -49,11 +49,13 @@ def send_message(bot: telegram.Bot, message: str) -> bool:
         return True
     except telegram.TelegramError as error:
         logging.error(f"Ошибка при отправке сообщения в Telegram: {error}")
-        raise error
+    else:
+        logging.debug('Статус отправлен в telegram')
 
 
 def get_api_answer(timestamp: int) -> dict:
     """Делает запрос к единственному эндпоинту API-сервиса."""
+    bot = telegram.Bot(token=TELEGRAM_TOKEN)
     try:
         params = {'from_date': timestamp}
         response = requests.get(ENDPOINT, headers=HEADERS, params=params)
@@ -61,8 +63,9 @@ def get_api_answer(timestamp: int) -> dict:
             raise RuntimeError(f"Ошибка запроса: {response.status_code}")
         return response.json()
     except requests.RequestException as error:
-        logging.error(f"Ошибка при запросе к API: {error}")
-        raise RuntimeError("Ошибка при запросе к API") from error
+        text = "Ошибка при запросе к API"
+        logging.error(f"{text}: {error}")
+        send_message(bot, f"Ошибка: {text}")
 
 
 def check_response(response: dict) -> bool:
