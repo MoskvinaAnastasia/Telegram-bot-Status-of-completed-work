@@ -155,7 +155,7 @@ def main():
                 timestamp = response.get("current_date")
 
         except Exception as error:
-            message = f"Ошибка в работе программы: {error}"
+            message = f'Сбой в работе программы: {error}'
             if last_message != message:
                 send_message(bot, message)
                 last_message = message
