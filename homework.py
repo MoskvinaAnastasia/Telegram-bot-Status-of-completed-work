@@ -41,7 +41,7 @@ def check_tokens() -> bool:
     return all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID])
 
 
-def send_message(bot: telegram.Bot, message: str) -> None:
+def send_message(bot: telegram.Bot, message: str) -> bool:
     """Отправляет сообщение в Telegram чат."""
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message,)
@@ -49,7 +49,7 @@ def send_message(bot: telegram.Bot, message: str) -> None:
         return True
     except telegram.TelegramError as error:
         logging.error(f"Ошибка при отправке сообщения в Telegram: {error}")
-        return False
+        raise error
 
 
 def get_api_answer(timestamp: int) -> dict:
@@ -103,17 +103,26 @@ def check_response(response: dict) -> bool:
 
 
 def parse_status(homework: dict) -> str:
-    """Извлекает статус домашней работы."""
-    if 'homework_name' not in homework:
-        raise ValueError("Отсутствует ключ 'homework_name' в ответе API")
-    homework_name = homework.get('homework_name')
+    """Извлекает статус, возвращает в Telegram строку статуса."""
+    if not isinstance(homework, dict):
+        raise TypeError('Полученный аргумент должен быть словарем.')
+    logging.debug('Получение статуса домашней работы')
     status = homework.get('status')
-    verdict = HOMEWORK_VERDICTS.get(status, 'Статус работы не определен')
-    if verdict == 'Статус работы не определен':
-        message = f"Неожиданный статус домашней работы в ответе API: {status}"
+    if 'status' not in homework:
+        message = 'Не найден ключ "status" в словаре домашней работы.'
         logging.error(message)
-        raise ValueError(message)
-    return f'Изменился статус проверки работы "{homework_name}". {verdict}'
+        raise KeyError(message)
+    verdict = HOMEWORK_VERDICTS.get(status)
+    if status not in HOMEWORK_VERDICTS:
+        message = f'Статус {status} не найден в HOMEWORK_VERDICTS.'
+        logging.error(message)
+        raise KeyError(message)
+    name = homework.get('homework_name')
+    if 'homework_name' not in homework:
+        message = 'Не найден ключ "homework_name" в словаре домашней работы.'
+        logging.error(message)
+        raise KeyError(message)
+    return f'Изменился статус проверки работы "{name}". {verdict}'
 
 
 def main():
@@ -124,7 +133,7 @@ def main():
         sys.exit(message)
 
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
-    timestamp = int(time.time())
+    timestamp = int(time.time()) - 2592000
     text = 'Я всего лишь машина, только имитация жизни, ' \
            'но давай проверим твою работу'
     bot.send_message(TELEGRAM_CHAT_ID, text)
@@ -134,28 +143,25 @@ def main():
         try:
             response = get_api_answer(timestamp)
             homeworks = check_response(response)
-            logging.debug('Проверка новой домашней работы')
-            if homeworks:
-                if homeworks[0] != last_message:
-                    try:
-                        message_sent = send_message(
-                            bot, parse_status(homeworks[0])
-                        )
-                        if message_sent:
-                            last_message = message_sent
-                            timestamp = int(time.time())
-                    except Exception as error:
-                        logging.error(f'Ошибка отправки сообщения '
-                                      f'в Telegram: {error}')
-                else:
-                    logging.debug('Новых домашних работ еще не было')
+            if homeworks is None:
+                logging.debug("Домашних работ нет.")
+            else:
+                index = 0
+                homework = homeworks[index]
+                message = parse_status(homework)
+                if last_message != message:
+                    send_message(bot, message)
+                    last_message = message
+                timestamp = response.get("current_date")
 
         except Exception as error:
-            message = f'Сбой в работе программы: {error}'
-            logging.error(message)
-            send_message(bot, f'Произошла ошибка: {error}')
-        time.sleep(RETRY_PERIOD)
+            message = f"Ошибка в работе программы: {error}"
+            if last_message != message:
+                send_message(bot, message)
+                last_message = message
 
+        finally:
+            time.sleep(RETRY_PERIOD)
 
 if __name__ == '__main__':
     main()
