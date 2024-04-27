@@ -46,7 +46,6 @@ def send_message(bot: telegram.Bot, message: str) -> bool:
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message,)
         logging.debug(f"Сообщение отправлено в Telegram: {message}")
-        return True
     except telegram.TelegramError as error:
         logging.error(f"Ошибка при отправке сообщения в Telegram: {error}")
     else:
@@ -145,7 +144,7 @@ def main():
         try:
             response = get_api_answer(timestamp)
             homeworks = check_response(response)
-            if homeworks is None:
+            if not homeworks:
                 logging.debug("Домашних работ нет.")
             else:
                 index = 0
@@ -169,6 +168,7 @@ def main():
 
         finally:
             time.sleep(RETRY_PERIOD)
+
 
 if __name__ == '__main__':
     main()
