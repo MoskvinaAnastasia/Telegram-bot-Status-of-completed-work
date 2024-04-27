@@ -53,54 +53,28 @@ def send_message(bot: telegram.Bot, message: str) -> bool:
 
 
 def get_api_answer(timestamp: int) -> dict:
-    """Делает запрос к единственному эндпоинту API-сервиса."""
+    """Отправляет запрос к API-сервису и возвращает ответ."""
+    payload = {'from_date': timestamp}
     try:
-        params = {'from_date': timestamp}
-        response = requests.get(ENDPOINT, headers=HEADERS, params=params)
-        if response.status_code != HTTPStatus.OK:
-            raise RuntimeError(f"Ошибка запроса: {response.status_code}")
+        response = requests.get(ENDPOINT, headers=HEADERS, params=payload)
+    except requests.RequestException as e:
+        raise RuntimeError(f'Произошла ошибка при запросе к API: {e}')
+    if response.status_code != HTTPStatus.OK:
+        raise RuntimeError(f'Код ответа: {response.status_code}')
+    try:
         return response.json()
-    except requests.RequestException as error:
-        text = "Ошибка при запросе к API"
-        logging.error(f"{text}: {error}")
-        raise RuntimeError(f"{text}: {error}") from error
+    except ValueError:
+        raise RuntimeError('Формат не соответствует json')
 
 
-def check_response(response: dict) -> bool:
-    """Проверяем ответ API на соответствие документации."""
-    if not response:
-        message = "В ответе пришел пустой словарь."
-        logging.error(message)
-        raise KeyError(message)
-
+def check_response(response: dict) -> list:
+    """Проверяет ответ API на соответствие документации."""
     if not isinstance(response, dict):
-        message = "Тип ответа не соответствует 'dict'."
-        logging.error(message)
-        raise TypeError(message)
-
-    if 'homeworks' not in response:
-        message = "В ответе отсутствует ключ 'homeworks'."
-        logging.error(message)
-        raise KeyError(message)
-
-    if 'current_date' not in response:
-        message = "В ответе отсутствует ключ 'current_date'."
-        logging.error(message)
-        raise KeyError(message)
-
+        logging.error('Ответ API должен быть в виде словаря')
+        raise TypeError('Ответ API должен быть в виде словаря')
     if not isinstance(response.get('homeworks'), list):
-        message = "Формат ответа не соответствует списку."
-        logging.error(message)
-        raise TypeError(message)
-
-    if not isinstance(response.get('current_date'), int):
-        message = "Формат ответа не соответствует числу."
-        logging.error(message)
-        raise TypeError(message)
-
-    homeworks = response.get('homeworks')
-    if homeworks is None:
-        raise ValueError('Ответ API не содержит ключ "homeworks"')
+        raise TypeError('homeworks должен быть представлен в виде списка')
+    return response['homeworks']
 
 
 def parse_status(homework: dict) -> str:
@@ -162,12 +136,14 @@ def main():
                     send_message(bot, message)
                     last_message = message
                 except Exception as send_error:
-                    logging.error(f'Ошибка при отправке сообщения: {send_error}')
+                    logging.error(
+                        f'Ошибка при отправке сообщения: {send_error}')
                 finally:
                     last_message = message
 
         finally:
             time.sleep(RETRY_PERIOD)
+
 
 if __name__ == '__main__':
     main()
