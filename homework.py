@@ -55,7 +55,6 @@ def send_message(bot: telegram.Bot, message: str) -> bool:
 
 def get_api_answer(timestamp: int) -> dict:
     """Делает запрос к единственному эндпоинту API-сервиса."""
-    bot = telegram.Bot(token=TELEGRAM_TOKEN)
     try:
         params = {'from_date': timestamp}
         response = requests.get(ENDPOINT, headers=HEADERS, params=params)
@@ -65,7 +64,7 @@ def get_api_answer(timestamp: int) -> dict:
     except requests.RequestException as error:
         text = "Ошибка при запросе к API"
         logging.error(f"{text}: {error}")
-        send_message(bot, f"Ошибка: {text}")
+        raise RuntimeError(f"{text}: {error}") from error
 
 
 def check_response(response: dict) -> bool:
@@ -136,7 +135,7 @@ def main():
         sys.exit(message)
 
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
-    timestamp = int(time.time()) - 2592000
+    timestamp = int(time.time())
     text = 'Я всего лишь машина, только имитация жизни, ' \
            'но давай проверим твою работу'
     bot.send_message(TELEGRAM_CHAT_ID, text)
@@ -160,8 +159,13 @@ def main():
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             if last_message != message:
-                send_message(bot, message)
-                last_message = message
+                try:
+                    send_message(bot, message)
+                    last_message = message
+                except Exception as send_error:
+                    logging.error(f'Ошибка при отправке сообщения: {send_error}')
+                finally:
+                    last_message = message
 
         finally:
             time.sleep(RETRY_PERIOD)
