@@ -73,7 +73,9 @@ def check_response(response: dict) -> list:
         logging.error('Ответ API должен быть в виде словаря')
         raise TypeError('Ответ API должен быть в виде словаря')
     if not isinstance(response.get('homeworks'), list):
-        raise TypeError('homeworks должен быть представлен в виде списка')
+        raise TypeError('homeworks должен быть в виде списка')
+    if not isinstance(response.get('current_date'), int):
+        raise TypeError('current_date должен быть в виде числа')
     return response['homeworks']
 
 
@@ -109,9 +111,6 @@ def main():
 
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
-    text = 'Я всего лишь машина, только имитация жизни, ' \
-           'но давай проверим твою работу'
-    bot.send_message(TELEGRAM_CHAT_ID, text)
     last_message = ""
 
     while True:
