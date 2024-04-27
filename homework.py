@@ -57,8 +57,8 @@ def get_api_answer(timestamp: int) -> dict:
     payload = {'from_date': timestamp}
     try:
         response = requests.get(ENDPOINT, headers=HEADERS, params=payload)
-    except requests.RequestException as e:
-        raise RuntimeError(f'Произошла ошибка при запросе к API: {e}')
+    except requests.RequestException as error:
+        raise RuntimeError(f'Произошла ошибка при запросе к API: {error}')
     if response.status_code != HTTPStatus.OK:
         raise RuntimeError(f'Код ответа: {response.status_code}')
     try:
@@ -83,10 +83,9 @@ def parse_status(homework: dict) -> str:
     """Извлекает статус, возвращает в Telegram строку статуса."""
     if not isinstance(homework, dict):
         raise TypeError('Полученный аргумент должен быть словарем.')
-    logging.debug('Получение статуса домашней работы')
     status = homework.get('status')
     if 'status' not in homework:
-        message = 'Не найден ключ "status" в словаре домашней работы.'
+        message = 'Нет ключа "status" в словаре домашней работы.'
         logging.error(message)
         raise KeyError(message)
     verdict = HOMEWORK_VERDICTS.get(status)
@@ -96,7 +95,7 @@ def parse_status(homework: dict) -> str:
         raise KeyError(message)
     name = homework.get('homework_name')
     if 'homework_name' not in homework:
-        message = 'Не найден ключ "homework_name" в словаре домашней работы.'
+        message = 'Нет ключа "homework_name" в словаре домашней работы.'
         logging.error(message)
         raise KeyError(message)
     return f'Изменился статус проверки работы "{name}". {verdict}'
@@ -105,7 +104,7 @@ def parse_status(homework: dict) -> str:
 def main():
     """Основная логика работы бота."""
     if not check_tokens():
-        message = 'Программа останавливается. Отсутствуют токены'
+        message = 'Программа не будет работать. Недостаточно токенов.'
         logging.critical(message)
         sys.exit(message)
 
