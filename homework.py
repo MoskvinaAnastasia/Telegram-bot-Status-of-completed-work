@@ -49,7 +49,6 @@ def check_tokens() -> list[str]:
         missing_tokens_str = ', '.join(missing_tokens)
         return (f'Программа не будет работать. '
                 f'Отсутствуют токены: {missing_tokens_str}')
-    return ''
 
 
 def send_message(bot: telegram.Bot, message: str) -> bool:
