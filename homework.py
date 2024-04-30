@@ -36,14 +36,20 @@ def check_tokens() -> list[str]:
     Проверяем доступность переменных окружения.
     И возвращаем список отсутствующих.
     """
+    tokens = {
+        'PRACTICUM_TOKEN': PRACTICUM_TOKEN,
+        'TELEGRAM_TOKEN': TELEGRAM_TOKEN,
+        'TELEGRAM_CHAT_ID': TELEGRAM_CHAT_ID
+    }
     missing_tokens = []
-    if not PRACTICUM_TOKEN:
-        missing_tokens.append('PRACTICUM_TOKEN')
-    if not TELEGRAM_TOKEN:
-        missing_tokens.append('TELEGRAM_TOKEN')
-    if not TELEGRAM_CHAT_ID:
-        missing_tokens.append('TELEGRAM_CHAT_ID')
-    return missing_tokens
+    for token_name, token_value in tokens.items():
+        if not token_value:
+            missing_tokens.append(token_name)
+    if missing_tokens:
+        missing_tokens_str = ', '.join(missing_tokens)
+        return (f'Программа не будет работать. '
+                f'Отсутствуют токены: {missing_tokens_str}')
+    return ''
 
 
 def send_message(bot: telegram.Bot, message: str) -> bool:
@@ -76,19 +82,14 @@ def check_response(response: dict) -> list:
         raise TypeError('Ответ API должен быть в виде словаря')
     homeworks = response.get('homeworks')
     if homeworks is None:
-        logging.error('Отсутствует ключ "homeworks" в ответе API')
         raise KeyError('Отсутствует ключ "homeworks" в ответе API')
     if not isinstance(homeworks, list):
-        logging.error('Значение ключа "homeworks" должно быть '
-                      'представлено в виде списка')
         raise TypeError('Значение ключа "homeworks" должно быть '
                         'представлено в виде списка')
     current_date = response.get('current_date')
     if current_date is None:
-        logging.debug('Отсутствует ключ "current_date" в ответе API')
+        logging.error('Отсутствует ключ "current_date" в ответе API')
     if not isinstance(current_date, int):
-        logging.error('Значение ключа "current_date" должно быть '
-                      'представлено в виде числа')
         raise TypeError('Значение ключа "current_date" должно быть '
                         'представлено в виде числа')
     return homeworks
@@ -101,30 +102,24 @@ def parse_status(homework: dict) -> str:
     status = homework.get('status')
     if 'status' not in homework:
         message = 'Нет ключа "status" в словаре домашней работы.'
-        logging.error(message)
         raise KeyError(message)
     verdict = HOMEWORK_VERDICTS.get(status)
-    if status not in HOMEWORK_VERDICTS:
+    if verdict is None:
         message = f'Статус {status} не найден в HOMEWORK_VERDICTS.'
-        logging.error(message)
-        raise KeyError(message)
+        raise ValueError(message)
     name = homework.get('homework_name')
     if 'homework_name' not in homework:
         message = 'Нет ключа "homework_name" в словаре домашней работы.'
-        logging.error(message)
         raise KeyError(message)
     return f'Изменился статус проверки работы "{name}". {verdict}'
 
 
 def main():
     """Основная логика работы бота."""
-    missing_tokens = check_tokens()
-    if missing_tokens:
-        missing_tokens_str = ', '.join(missing_tokens)
-        message = (f'Программа не будет работать. '
-                   f'Отсутствуют токены: {missing_tokens_str}')
-        logging.critical(message)
-        sys.exit(message)
+    missing_tokens_message = check_tokens()
+    if missing_tokens_message:
+        logging.critical(missing_tokens_message)
+        sys.exit(missing_tokens_message)
 
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time()) - 2592000
@@ -137,8 +132,7 @@ def main():
             if not homeworks:
                 logging.debug("Домашних работ нет.")
             else:
-                index = 0
-                homework = homeworks[index]
+                homework = homeworks[0]
                 message = parse_status(homework)
                 if last_message != message:
                     send_message(bot, message)
@@ -148,14 +142,8 @@ def main():
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             if last_message != message:
-                try:
-                    send_message(bot, message)
-                    last_message = message
-                except Exception as send_error:
-                    logging.error(
-                        f'Ошибка при отправке сообщения: {message}, '
-                        f'ошибка: {send_error}')
-                    last_message = message
+                send_message(bot, message)
+                last_message = message
 
         finally:
             time.sleep(RETRY_PERIOD)
