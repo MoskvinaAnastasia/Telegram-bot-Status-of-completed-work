@@ -36,19 +36,16 @@ def check_tokens() -> list[str]:
     Проверяем доступность переменных окружения.
     И возвращаем список отсутствующих.
     """
-    tokens = {
-        'PRACTICUM_TOKEN': PRACTICUM_TOKEN,
-        'TELEGRAM_TOKEN': TELEGRAM_TOKEN,
-        'TELEGRAM_CHAT_ID': TELEGRAM_CHAT_ID
-    }
     missing_tokens = []
-    for token_name, token_value in tokens.items():
-        if not token_value:
+    required_tokens = ['PRACTICUM_TOKEN', 'TELEGRAM_TOKEN', 'TELEGRAM_CHAT_ID']
+    for token_name in required_tokens:
+        if not globals().get(token_name):
             missing_tokens.append(token_name)
     if missing_tokens:
         missing_tokens_str = ', '.join(missing_tokens)
-        return (f'Программа не будет работать. '
-                f'Отсутствуют токены: {missing_tokens_str}')
+        logging.critical(f'Программа не будет работать. '
+                         f'Отсутствуют токены: {missing_tokens_str}')
+        sys.exit()
 
 
 def send_message(bot: telegram.Bot, message: str) -> bool:
@@ -88,9 +85,6 @@ def check_response(response: dict) -> list:
     current_date = response.get('current_date')
     if current_date is None:
         logging.error('Отсутствует ключ "current_date" в ответе API')
-    if not isinstance(current_date, int):
-        raise TypeError('Значение ключа "current_date" должно быть '
-                        'представлено в виде числа')
     return homeworks
 
 
@@ -121,8 +115,19 @@ def main():
         sys.exit(missing_tokens_message)
 
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
-    timestamp = int(time.time()) - 2592000
+    timestamp = int(time.time())
     last_message = ""
+
+    def send_unique_message(bot: telegram.Bot, message: str,
+                            last_message: str) -> str:
+        """
+        Отправляет уникальное сообщение только если оно.
+        отличается от последнего отправленного.
+        """
+        if last_message != message:
+            send_message(bot, message)
+            return message
+        return last_message
 
     while True:
         try:
@@ -133,17 +138,11 @@ def main():
             else:
                 homework = homeworks[0]
                 message = parse_status(homework)
-                if last_message != message:
-                    send_message(bot, message)
-                    last_message = message
+                last_message = send_unique_message(bot, message, last_message)
                 timestamp = response.get("current_date")
-
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
-            if last_message != message:
-                send_message(bot, message)
-                last_message = message
-
+            last_message = send_unique_message(bot, message, last_message)
         finally:
             time.sleep(RETRY_PERIOD)
 
