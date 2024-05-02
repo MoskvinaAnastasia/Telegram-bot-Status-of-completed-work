@@ -31,6 +31,13 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_FILE_PATH = os.path.join(SCRIPT_DIR, 'logging_bot.log')
 
 
+class CurrentDateError(Exception):
+    """
+    Исключение, которое сигнализирует об ошибке с ключом.
+    current_date в ответе API.
+    """
+
+
 def check_tokens() -> list[str]:
     """
     Проверяем доступность переменных окружения.
@@ -82,9 +89,13 @@ def check_response(response: dict) -> list:
     if not isinstance(homeworks, list):
         raise TypeError('Значение ключа "homeworks" должно быть '
                         'представлено в виде списка')
-    current_date = response.get('current_date')
-    if current_date is None:
-        logging.error('Отсутствует ключ "current_date" в ответе API')
+    if 'current_date' not in response:
+        message = 'Отсутствует ключ "current_date" в ответе API'
+        raise CurrentDateError(message)
+    if not isinstance(response['current_date'], int):
+        message = ('Значение ключа current_date должно'
+                   'быть представлено в виде списка')
+        raise CurrentDateError
     return homeworks
 
 
@@ -140,6 +151,8 @@ def main():
                 message = parse_status(homework)
                 last_message = send_unique_message(bot, message, last_message)
                 timestamp = response.get("current_date")
+        except CurrentDateError as error:
+            logging.error(f'Ошибка в текущей дате в ответе API: {error}')
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             last_message = send_unique_message(bot, message, last_message)
