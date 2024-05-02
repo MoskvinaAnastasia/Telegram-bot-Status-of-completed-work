@@ -118,6 +118,18 @@ def parse_status(homework: dict) -> str:
     return f'Изменился статус проверки работы "{name}". {verdict}'
 
 
+def send_unique_message(bot: telegram.Bot, message: str,
+                        last_message: str) -> str:
+    """
+    Отправляет уникальное сообщение только если оно.
+    отличается от последнего отправленного.
+    """
+    if last_message != message:
+        send_message(bot, message)
+        return message
+    return last_message
+
+
 def main():
     """Основная логика работы бота."""
     missing_tokens_message = check_tokens()
@@ -128,17 +140,6 @@ def main():
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
     last_message = ""
-
-    def send_unique_message(bot: telegram.Bot, message: str,
-                            last_message: str) -> str:
-        """
-        Отправляет уникальное сообщение только если оно.
-        отличается от последнего отправленного.
-        """
-        if last_message != message:
-            send_message(bot, message)
-            return message
-        return last_message
 
     while True:
         try:
