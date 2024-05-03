@@ -4,11 +4,12 @@ import os
 import sys
 import time
 from http import HTTPStatus
-from exceptions import CurrentDateError
 
 from dotenv import load_dotenv
 import requests
 import telegram
+
+from exceptions import CurrentDateError
 
 
 load_dotenv()
@@ -37,7 +38,6 @@ def check_tokens() -> list[str]:
     Проверяем доступность переменных окружения.
     И возвращаем список отсутствующих.
     """
-    missing_tokens = []
     required_tokens = ('PRACTICUM_TOKEN', 'TELEGRAM_TOKEN', 'TELEGRAM_CHAT_ID')
     missing_tokens = [token_name for token_name in required_tokens
                       if not globals().get(token_name)]
@@ -136,7 +136,6 @@ def main():
 
     while True:
         try:
-            timestamp = int(time.time())
             response = get_api_answer(timestamp)
             homeworks = check_response(response)
             if not homeworks:
@@ -145,6 +144,7 @@ def main():
                 homework = homeworks[0]
                 message = parse_status(homework)
                 last_message = send_unique_message(bot, message, last_message)
+            timestamp = response.get('current_date', timestamp) + 1
         except CurrentDateError as error:
             logging.error(f'Ошибка в текущей дате в ответе API: {error}')
         except Exception as error:
