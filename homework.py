@@ -4,6 +4,7 @@ import os
 import sys
 import time
 from http import HTTPStatus
+from exceptions import CurrentDateError
 
 from dotenv import load_dotenv
 import requests
@@ -31,28 +32,20 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_FILE_PATH = os.path.join(SCRIPT_DIR, 'logging_bot.log')
 
 
-class CurrentDateError(Exception):
-    """
-    Исключение, которое сигнализирует об ошибке с ключом.
-    current_date в ответе API.
-    """
-
-
 def check_tokens() -> list[str]:
     """
     Проверяем доступность переменных окружения.
     И возвращаем список отсутствующих.
     """
     missing_tokens = []
-    required_tokens = ['PRACTICUM_TOKEN', 'TELEGRAM_TOKEN', 'TELEGRAM_CHAT_ID']
-    for token_name in required_tokens:
-        if not globals().get(token_name):
-            missing_tokens.append(token_name)
+    required_tokens = ('PRACTICUM_TOKEN', 'TELEGRAM_TOKEN', 'TELEGRAM_CHAT_ID')
+    missing_tokens = [token_name for token_name in required_tokens
+                      if not globals().get(token_name)]
     if missing_tokens:
         missing_tokens_str = ', '.join(missing_tokens)
         logging.critical(f'Программа не будет работать. '
                          f'Отсутствуют токены: {missing_tokens_str}')
-        sys.exit()
+        sys.exit(1)
 
 
 def send_message(bot: telegram.Bot, message: str) -> bool:
@@ -95,7 +88,7 @@ def check_response(response: dict) -> list:
     if not isinstance(response['current_date'], int):
         message = ('Значение ключа current_date должно'
                    'быть представлено в виде списка')
-        raise CurrentDateError
+        raise CurrentDateError(message)
     return homeworks
 
 
@@ -135,7 +128,7 @@ def main():
     missing_tokens_message = check_tokens()
     if missing_tokens_message:
         logging.critical(missing_tokens_message)
-        sys.exit(missing_tokens_message)
+        sys.exit()
 
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
@@ -143,6 +136,7 @@ def main():
 
     while True:
         try:
+            timestamp = int(time.time())
             response = get_api_answer(timestamp)
             homeworks = check_response(response)
             if not homeworks:
@@ -151,7 +145,6 @@ def main():
                 homework = homeworks[0]
                 message = parse_status(homework)
                 last_message = send_unique_message(bot, message, last_message)
-                timestamp = response.get("current_date")
         except CurrentDateError as error:
             logging.error(f'Ошибка в текущей дате в ответе API: {error}')
         except Exception as error:
