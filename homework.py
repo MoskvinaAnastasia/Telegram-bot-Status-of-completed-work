@@ -144,7 +144,7 @@ def main():
                 homework = homeworks[0]
                 message = parse_status(homework)
                 last_message = send_unique_message(bot, message, last_message)
-            timestamp = response.get('current_date', timestamp) + 1
+            timestamp = response['current_date']
         except CurrentDateError as error:
             logging.error(f'Ошибка в текущей дате в ответе API: {error}')
         except Exception as error:
